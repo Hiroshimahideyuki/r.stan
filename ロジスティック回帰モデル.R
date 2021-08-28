@@ -1,33 +1,35 @@
-�
+#ロジスティック回帰の推定
+#一般化線形モデルの二値データを扱う標準的な方法
+
+#パッケージの読み込み
 library(rstan)
 library(brms)
-
+#計算の高速化
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-
+#分析対象のデータ
 germination_dat <- read.csv("3-9-1-germination.csv")
 head(germination_dat, n = 3)
-
+#データの要約
 summary(germination_dat)
-
+#図示
 ggplot(data = germination_dat, 
        mapping = aes(x = nutrition, y = germination, color = solar)) +
   geom_point() +
-  labs(title = "")
-
+  labs(title = "趣旨の発芽率と、日照の有無・栄養素の量の関係")
 
 glm_binom_brms <- brm(
-  germination | trials(size) ~ solar + nutrition, 
-  family = binomial(),
-  data = germination_dat,
-  seed = 1,
-  prior = c(set_prior("", class = "Intercept"))
+  germination | trials(size) ~ solar + nutrition,#modelの構造の指定 
+  family = binomial(),#二項分布を使う
+  data = germination_dat,#データ
+  seed = 1,#乱数の種
+  prior = c(set_prior("", class = "Intercept"))#無情報事前分布にする
 )
-
+#MCMCの結果の確認
 glm_binom_brms
 
-
+#説明変数を作る
 newdata_1 <- data.frame(
   solar = c("shade", "sunshine", "sunshine"),
   nutrition = c(2,2,3),
@@ -35,25 +37,28 @@ newdata_1 <- data.frame(
 )
 newdata_1
 
+#線形予測子の予測値
 linear_fit <- fitted(glm_binom_brms, newdata_1, scale = "linear")[,1]
+#ロジスティック関数を適用して、成功確率を計算
 fit <- 1 / (1 + exp(-linear_fit))
 fit
 
+#オッズを計算
 odds_1 <- fit[1] / (1 - fit[1])
 odds_2 <- fit[2] / (1 - fit[2])
 odds_3 <- fit[3] / (1 - fit[3])
 
+#モデルの係数を取得
 coef <- fixef(glm_binom_brms)[,1]
 coef
 
 odds_2 / odds_1
 exp(coef["solarsunshine"])
 
-
 odds_3 / odds_2
 exp(coef["nutrition"])
 
-
+#回帰曲線の図示(95%ベイズ信用区間付きのグラフ)
 eff <- marginal_effects(glm_binom_brms, 
                         effects = "nutrition:solar")
 
